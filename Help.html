@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
+      font-size: 13px;
+      color: #1f2937;
+      line-height: 1.65;
+      padding: 4px 18px 24px;
+    }
+    h1 { font-size: 18px; border-bottom: 2px solid #2b6cb0; padding-bottom: 6px; }
+    h2 { font-size: 14px; color: #1f4e82; margin-top: 22px; }
+    h3 { font-size: 13px; margin: 14px 0 4px; }
+    code, pre { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-family: 'SF Mono', Menlo, monospace; }
+    pre { padding: 8px 12px; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 12px; }
+    th, td { border: 1px solid #d9dee5; padding: 5px 8px; text-align: left; }
+    th { background: #eef3f9; }
+    .note {
+      background: #fffbe6;
+      border-left: 4px solid #f59e0b;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 12px;
+    }
+    .ok { color: #047857; }
+    ol li, ul li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h1>📋 タスク連携ツール ヘルプ</h1>
+  <p>毎朝 5:00 に、スプレッドシートに登録された曜日別タスクを Notion データベースへ自動投入します。</p>
+
+  <h2>1. セットアップ手順</h2>
+  <ol>
+    <li>Notion で <b>Integration</b> を作成 → <code>Internal Integration Token</code> (<code>secret_...</code>) を取得。
+      <br>(<a href="https://www.notion.so/my-integrations" target="_blank">https://www.notion.so/my-integrations</a>)</li>
+    <li>送信先の Notion データベースを開き、右上の <b>…</b> → <b>+ Add connections</b> から上記 Integration を追加。</li>
+    <li>データベース URL から <b>Database ID</b> を取得 (URL の <code>?</code> 以前の最後の 32 桁)。</li>
+    <li>サイドバーの「2. Notion 認証情報」で Integration Key と Database ID を入力 →「保存」→「接続テスト」で OK が出ることを確認。</li>
+    <li>「3. 初期設定」を 1 回だけ実行 (シート 2 枚 + ログシートを生成)。</li>
+    <li>「4. トリガー」で <b>毎朝5時トリガーを有効化</b>。</li>
+    <li>必要に応じて「5. 手動実行」でテスト送信。</li>
+  </ol>
+
+  <h2>2. シート構成</h2>
+
+  <h3>2-1. <code>タスクマスタ</code> シート</h3>
+  <p>毎日 (曜日ごと) に送りたいタスクを 1 行 1 タスクで記入します。</p>
+  <table>
+    <tr><th>列</th><th>内容</th><th>備考</th></tr>
+    <tr><td>曜日</td><td>月 / 火 / 水 / 木 / 金 / 土 / 日</td><td>必須・データ入力規則あり</td></tr>
+    <tr><td>タスク名</td><td>Notion ページのタイトル</td><td>必須</td></tr>
+    <tr><td>カテゴリ</td><td>任意の分類</td><td>Notion 側で <code>Select</code> 型推奨</td></tr>
+    <tr><td>優先度</td><td>高 / 中 / 低</td><td>データ入力規則あり</td></tr>
+    <tr><td>備考</td><td>補足テキスト</td><td>長文可</td></tr>
+    <tr><td>有効</td><td>チェックON のみ送信対象</td><td>OFF にすると一時停止できる</td></tr>
+  </table>
+
+  <h3>2-2. <code>設定</code> シート (マッピング)</h3>
+  <p>「スプレッドシートのどの列を、Notion のどのプロパティに、どの型で送るか」を定義します。<br>
+     Notion 側のプロパティ名や型を変更したら、このシートを編集してください。</p>
+  <table>
+    <tr><th>シート列名</th><th>Notion プロパティ名</th><th>型</th></tr>
+    <tr><td>タスク名</td><td>Name</td><td>title</td></tr>
+    <tr><td>カテゴリ</td><td>カテゴリ</td><td>select</td></tr>
+    <tr><td>優先度</td><td>優先度</td><td>select</td></tr>
+    <tr><td>備考</td><td>備考</td><td>rich_text</td></tr>
+  </table>
+  <p>加えて、以下は自動で付与されます (シートに列を作る必要なし)。</p>
+  <table>
+    <tr><th>プロパティ名</th><th>型</th><th>値</th></tr>
+    <tr><td>実行日</td><td>date</td><td>送信日 (今日)</td></tr>
+    <tr><td>曜日</td><td>select</td><td>月 / 火 / 水 / 木 / 金 / 土 / 日</td></tr>
+  </table>
+
+  <h2>3. Notion データベースの初期構造</h2>
+  <p>初期想定では以下のプロパティを Notion 側に作成しておきます。</p>
+  <table>
+    <tr><th>プロパティ名</th><th>型</th></tr>
+    <tr><td><b>Name</b></td><td>title (必須・最初から存在)</td></tr>
+    <tr><td>カテゴリ</td><td>Select</td></tr>
+    <tr><td>優先度</td><td>Select (選択肢: 高 / 中 / 低)</td></tr>
+    <tr><td>備考</td><td>Text</td></tr>
+    <tr><td>実行日</td><td>Date</td></tr>
+    <tr><td>曜日</td><td>Select (選択肢: 月 〜 日)</td></tr>
+  </table>
+
+  <h2>4. データベース構造を変更したい時</h2>
+  <ol>
+    <li>Notion 側でプロパティを追加 / 名称変更 / 型変更を行う。</li>
+    <li>スプレッドシートの <code>タスクマスタ</code> シートに必要な列を追加 (列ヘッダ名は自由)。</li>
+    <li><code>設定</code> シートに <code>シート列名 / Notionプロパティ名 / 型</code> の対応行を追加または更新。</li>
+    <li>サイドバーから「接続テスト」で Notion 側プロパティ一覧と照合。</li>
+    <li>「手動実行」で 1 度送ってみて、エラーが出ないか確認。</li>
+  </ol>
+
+  <h2>5. 対応している Notion プロパティ型</h2>
+  <table>
+    <tr><th>型 (設定シートに記入)</th><th>変換ルール</th></tr>
+    <tr><td>title</td><td>セル値をタイトルにする (1 DB に 1 つだけ必須)</td></tr>
+    <tr><td>rich_text</td><td>セル値を本文テキストに</td></tr>
+    <tr><td>select</td><td>セル値をそのまま選択肢名に (Notion側に同名選択肢が必要)</td></tr>
+    <tr><td>multi_select</td><td>セル値を <code>,</code> 区切りで複数選択肢に</td></tr>
+    <tr><td>date</td><td>日付文字列を ISO 形式に変換</td></tr>
+    <tr><td>number</td><td>数値に変換</td></tr>
+    <tr><td>checkbox</td><td>TRUE / FALSE に変換</td></tr>
+    <tr><td>url</td><td>セル値をそのまま URL に</td></tr>
+  </table>
+
+  <h2>6. よくあるトラブル</h2>
+  <table>
+    <tr><th>症状</th><th>対処</th></tr>
+    <tr><td>401 Unauthorized</td><td>Integration Key が誤っているか、Notion DB に Integration が接続されていない。</td></tr>
+    <tr><td>404 / object_not_found</td><td>Database ID が誤っている。または Integration が DB にアクセス権を持っていない。</td></tr>
+    <tr><td>property does not exist</td><td><code>設定</code> シートの「Notionプロパティ名」と実際の DB のプロパティ名が一致していない。</td></tr>
+    <tr><td>選択肢が作成されない</td><td>Notion 側で対象 <code>Select</code> プロパティの「Allow new options」を ON にするか、選択肢を事前定義する。</td></tr>
+    <tr><td>トリガーが動かない</td><td>サイドバー「4. トリガー」で再有効化。実行履歴は GAS の「実行数」画面で確認。</td></tr>
+  </table>
+
+  <div class="note">
+    <b>メモ:</b> Notion API のレートリミット (3req/sec) を考慮して、1 件送信ごとに 350ms スリープしています。
+    大量タスク (50 件以上) を一度に送ると、GAS の 6 分制限に近づく可能性があるので、必要なら分割してください。
+  </div>
+
+  <h2>7. ログ</h2>
+  <p>送信結果は <code>ログ</code> シートに自動追記されます (日時 / 対象曜日 / 成功件数 / 失敗件数 / 詳細)。</p>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --primary: #2b6cb0;
+      --primary-dark: #1f4e82;
+      --border: #d9dee5;
+      --bg: #f7f9fc;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --success: #047857;
+      --danger: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
+      font-size: 13px;
+      color: var(--text);
+      margin: 0;
+      padding: 0 12px 24px;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      padding: 10px 0 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      z-index: 10;
+    }
+    h1 { font-size: 14px; margin: 0; }
+    .help-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      width: 28px; height: 28px; border-radius: 50%;
+      cursor: pointer;
+      font-weight: bold;
+      color: var(--primary);
+    }
+    .help-btn:hover { background: var(--bg); }
+
+    section {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      background: #fff;
+    }
+    section h2 {
+      font-size: 12px;
+      margin: 0 0 8px;
+      color: var(--primary-dark);
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    label { display: block; margin-bottom: 6px; font-size: 12px; color: var(--muted); }
+    input[type="text"], input[type="password"], select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    button {
+      width: 100%;
+      padding: 7px 10px;
+      border: 0;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    button.secondary {
+      background: #fff;
+      color: var(--primary);
+      border: 1px solid var(--primary);
+    }
+    button.danger { background: var(--danger); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .row { display: flex; gap: 6px; }
+    .row > * { flex: 1; }
+    .status-line {
+      font-size: 12px;
+      padding: 4px 0;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .status-line .v { color: var(--muted); }
+    .ok { color: var(--success); }
+    .ng { color: var(--danger); }
+    #toast {
+      position: fixed;
+      bottom: 12px; left: 12px; right: 12px;
+      padding: 8px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      display: none;
+      z-index: 100;
+    }
+    #toast.success { background: #d1fae5; color: var(--success); border: 1px solid #6ee7b7; }
+    #toast.error   { background: #fee2e2; color: var(--danger); border: 1px solid #fca5a5; white-space: pre-wrap; }
+    .small { font-size: 11px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📋 タスク連携 設定</h1>
+    <button class="help-btn" title="ヘルプ" onclick="openHelp()">?</button>
+  </header>
+
+  <section>
+    <h2>1. ステータス</h2>
+    <div class="status-line"><span>Integration Key</span><span id="st-key" class="v">-</span></div>
+    <div class="status-line"><span>Database ID</span><span id="st-db" class="v">-</span></div>
+    <div class="status-line"><span>毎朝5時トリガー</span><span id="st-trigger" class="v">-</span></div>
+    <div class="status-line"><span>最終実行</span><span id="st-last" class="v">-</span></div>
+    <div class="small" id="st-result"></div>
+  </section>
+
+  <section>
+    <h2>2. Notion 認証情報</h2>
+    <label>Integration Key (secret_...)</label>
+    <input id="key" type="password" placeholder="secret_xxxxxxxxxxxx" autocomplete="off">
+    <label>Database ID</label>
+    <input id="db" type="text" placeholder="32桁のID" autocomplete="off">
+    <button onclick="saveCreds()">保存</button>
+    <button class="secondary" onclick="testConn()">接続テスト</button>
+  </section>
+
+  <section>
+    <h2>3. 初期設定</h2>
+    <p class="small">シート2枚 (タスクマスタ / 設定) を作成し、ダミーデータを投入します。既存シートは上書きしません。</p>
+    <button onclick="runSetup()">初期設定を実行</button>
+  </section>
+
+  <section>
+    <h2>4. トリガー</h2>
+    <p class="small">毎朝 5:00〜6:00 の間に「その日の曜日のタスク」を Notion に送信します。</p>
+    <button onclick="enableTrigger()">毎朝5時トリガーを有効化</button>
+    <button class="secondary" onclick="disableTrigger()">トリガーを停止</button>
+  </section>
+
+  <section>
+    <h2>5. 手動実行 (テスト)</h2>
+    <button onclick="runToday()">今日分を今すぐ送信</button>
+    <label>曜日を指定して送信</label>
+    <div class="row">
+      <select id="day">
+        <option value="月">月</option>
+        <option value="火">火</option>
+        <option value="水">水</option>
+        <option value="木">木</option>
+        <option value="金">金</option>
+        <option value="土">土</option>
+        <option value="日">日</option>
+      </select>
+      <button class="secondary" onclick="runDay()">送信</button>
+    </div>
+  </section>
+
+  <div id="toast"></div>
+
+  <script>
+    function openHelp() {
+      google.script.run.showHelp();
+    }
+
+    function toast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = type || 'success';
+      el.style.display = 'block';
+      setTimeout(function () { el.style.display = 'none'; }, 4000);
+    }
+
+    function refreshStatus() {
+      google.script.run
+        .withSuccessHandler(function (s) {
+          document.getElementById('st-key').textContent = s.hasKey ? '✓ ' + s.maskedKey : '未設定';
+          document.getElementById('st-key').className = 'v ' + (s.hasKey ? 'ok' : 'ng');
+          document.getElementById('st-db').textContent = s.hasDatabaseId ? '✓ ' + s.maskedDb : '未設定';
+          document.getElementById('st-db').className = 'v ' + (s.hasDatabaseId ? 'ok' : 'ng');
+          document.getElementById('st-trigger').textContent = s.triggerEnabled ? '有効' : '無効';
+          document.getElementById('st-trigger').className = 'v ' + (s.triggerEnabled ? 'ok' : 'ng');
+          document.getElementById('st-last').textContent = s.lastRunAt || '-';
+          document.getElementById('st-result').textContent = s.lastRunResult || '';
+        })
+        .getStatus();
+    }
+
+    function saveCreds() {
+      const integrationKey = document.getElementById('key').value;
+      const databaseId = document.getElementById('db').value;
+      google.script.run
+        .withSuccessHandler(function (r) {
+          toast(r.message, 'success');
+          document.getElementById('key').value = '';
+          refreshStatus();
+        })
+        .withFailureHandler(function (e) { toast(e.message, 'error'); })
+        .saveCredentials({ integrationKey: integrationKey, databaseId: databaseId });
+    }
+
+    function testConn() {
+      toast('接続テスト中...', 'success');
+      google.script.run
+        .withSuccessHandler(function (r) {
+          toast('✓ 接続成功: 「' + (r.title || '(無題)') + '」\nプロパティ: ' + r.properties.join(', '), 'success');
+        })
+        .withFailureHandler(function (e) { toast(e.message, 'error'); })
+        .testNotionConnection();
+    }
+
+    function runSetup() {
+      google.script.run
+        .withSuccessHandler(function (r) { toast(r.message, 'success'); refreshStatus(); })
+        .withFailureHandler(function (e) { toast(e.message, 'error'); })
+        .runInitialSetup();
+    }
+
+    function enableTrigger() {
+      google.script.run
+        .withSuccessHandler(function (r) { toast(r.message, 'success'); refreshStatus(); })
+        .withFailureHandler(function (e) { toast(e.message, 'error'); })
+        .enableDailyTrigger();
+    }
+
+    function disableTrigger() {
+      google.script.run
+        .withSuccessHandler(function (r) { toast(r.message, 'success'); refreshStatus(); })
+        .withFailureHandler(function (e) { toast(e.message, 'error'); })
+        .removeDailyTrigger();
+    }
+
+    function runToday() {
+      toast('送信中...', 'success');
+      google.script.run
+        .withSuccessHandler(function (r) { toast(r.message, r.ok ? 'success' : 'error'); refreshStatus(); })
+        .withFailureHandler(function (e) { toast(e.message, 'error'); })
+        .sendTodayTasksManually();
+    }
+
+    function runDay() {
+      const day = document.getElementById('day').value;
+      toast('送信中 (' + day + ')...', 'success');
+      google.script.run
+        .withSuccessHandler(function (r) { toast(r.message, r.ok ? 'success' : 'error'); refreshStatus(); })
+        .withFailureHandler(function (e) { toast(e.message, 'error'); })
+        .sendTasksForSpecifiedDay(day);
+    }
+
+    refreshStatus();
+  </script>
+</body>
+</html>
